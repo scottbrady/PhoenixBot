@@ -97,6 +97,10 @@ class SettingsPage(QtWidgets.QWidget):
                                                  self.small_font, "Gamestop.com Username (Email)")
         self.gamestop_pass_edit = self.create_edit(self.settings_card, QtCore.QRect(300, 390, 235, 20),
                                                  self.small_font, "Gamestop.com Password")
+        self.costco_user_edit = self.create_edit(self.settings_card, QtCore.QRect(570, 310, 235, 20),
+                                                 self.small_font, "Costco.com Username (Email)")
+        self.costco_pass_edit = self.create_edit(self.settings_card, QtCore.QRect(570, 335, 235, 20),
+                                                 self.small_font, "Costco.com Password")
         
         self.set_data()
         QtCore.QMetaObject.connectSlotsByName(settingspage)
@@ -151,6 +155,16 @@ class SettingsPage(QtWidgets.QWidget):
         except:
             self.gamestop_pass_edit.setText("")
 
+        try:
+            self.costco_user_edit.setText(settings["costco_user"])
+        except:
+            self.costco_user_edit.setText("")
+
+        try:
+            self.costco_pass_edit.setText((Encryption().decrypt(settings["costco_pass"].encode("utf-8"))).decode("utf-8"))
+        except:
+            self.costco_pass_edit.setText("")
+
         self.update_settings(settings)
 
     def save_settings(self):
@@ -168,14 +182,16 @@ class SettingsPage(QtWidgets.QWidget):
                     "target_user": self.target_user_edit.text(),
                     "target_pass": Encryption().encrypt(self.target_pass_edit.text()).decode("utf-8"),
                     "gamestop_user": self.gamestop_user_edit.text(),
-                    "gamestop_pass": Encryption().encrypt(self.gamestop_pass_edit.text()).decode("utf-8")}
+                    "gamestop_pass": Encryption().encrypt(self.gamestop_pass_edit.text()).decode("utf-8"),
+                    "costco_user": self.costco_user_edit.text(),
+                    "costco_pass": Encryption().encrypt(self.costco_pass_edit.text()).decode("utf-8")}
 
         write_data("./data/settings.json",settings)
         self.update_settings(settings)
         QtWidgets.QMessageBox.information(self, "Phoenix Bot", "Saved Settings")
 
     def update_settings(self, settings_data):
-        global webhook, webhook_on_browser, webhook_on_order, webhook_on_failed, browser_on_failed, dont_buy, random_delay_start, random_delay_stop, target_user, target_pass, gamestop_user, gamestop_pass
+        global webhook, webhook_on_browser, webhook_on_order, webhook_on_failed, browser_on_failed, dont_buy, random_delay_start, random_delay_stop, target_user, target_pass, gamestop_user, gamestop_pass, costco_user, costco_pass
         settings.webhook, settings.webhook_on_browser, settings.webhook_on_order, settings.webhook_on_failed, settings.browser_on_failed, settings.buy_one, settings.dont_buy = settings_data["webhook"], settings_data["webhookonbrowser"], settings_data["webhookonorder"], settings_data["webhookonfailed"], settings_data["browseronfailed"], settings_data['onlybuyone'], settings_data['dont_buy']
 
         if settings_data.get("random_delay_start", "") != "":
@@ -194,3 +210,7 @@ class SettingsPage(QtWidgets.QWidget):
             settings.gamestop_user = settings_data["gamestop_user"]
         if settings_data.get("gamestop_pass", "") != "":
             settings.gamestop_pass = (Encryption().decrypt(settings_data["gamestop_pass"].encode("utf-8"))).decode("utf-8")
+        if settings_data.get("costco_user", "") != "":
+            settings.costco_user = settings_data["costco_user"]
+        if settings_data.get("costco_pass", "") != "":
+            settings.costco_pass = (Encryption().decrypt(settings_data["costco_pass"].encode("utf-8"))).decode("utf-8")

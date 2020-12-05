@@ -97,6 +97,7 @@ class CreateDialog(QtWidgets.QDialog):
         self.site_box.addItem("Walmart")
         self.site_box.addItem("Target")
         self.site_box.addItem("GameStop")
+        self.site_box.addItem("Costco")
 
         QtCore.QMetaObject.connectSlotsByName(CreateDialog)
     def autofill(self):
@@ -108,6 +109,8 @@ class CreateDialog(QtWidgets.QDialog):
             self.site_box.setCurrentIndex(self.site_box.findText("Target"))
         elif "gamestop" in self.input_edit.text():
             self.site_box.setCurrentIndex(self.site_box.findText("GameStop"))
+        elif "costco" in self.input_edit.text():
+            self.site_box.setCurrentIndex(self.site_box.findText("Costco"))
 
     def load_data(self, task_tab):
         self.site_box.setCurrentText(task_tab.site)
