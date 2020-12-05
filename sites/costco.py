@@ -5,6 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait as wait
 from webdriver_manager.chrome import ChromeDriverManager
 from chromedriver_py import binary_path as driver_path
 from utils import random_delay, send_webhook, create_msg
+from utils.selenium_utils import find_immediate_then_wait, clickable_immediate_then_wait
 import settings, time
 
 class Costco:
@@ -29,7 +30,7 @@ class Costco:
         self.login()
         self.load_product()
         self.monitor()
-        self.load_checkout()
+        self.load_cart()
         self.check_out()
 
     def init_driver(self):
@@ -65,21 +66,23 @@ class Costco:
                 time.sleep(self.SHORT_TIMEOUT)
 
     def load_product(self):
+        self.status_signal.emit(create_msg("Loading Product", "normal"))
         product_loaded = False
         while not product_loaded:
             try:
-                self.status_signal.emit(create_msg("Loading Product", "normal"))
                 self.browser.get(self.product)
-                wait(self.browser, self.LONG_TIMEOUT).until(lambda _: self.browser.current_url == self.product)
+                clickable_immediate_then_wait(self.browser, self.LONG_TIMEOUT, "#add-to-list-button")
                 product_loaded = True
             except:
-                time.sleep(self.SHORT_TIMEOUT)
+                time.sleep(self.LONG_TIMEOUT)
 
     def monitor(self):
+        self.status_signal.emit(create_msg("Looking for Stock", "normal"))
         in_stock = False
+        add_fail_count = 0
         while not in_stock:
             try:
-                wait(self.browser, random_delay(self.monitor_delay, settings.random_delay_start, settings.random_delay_stop)).until(EC.element_to_be_clickable((By.ID, "add-to-cart-btn")))
+                clickable_immediate_then_wait(self.browser, self.LONG_TIMEOUT, "#add-to-cart-btn")
                 self.status_signal.emit(create_msg("In Stock", "normal"))
                 in_stock = True
                 in_cart = False
@@ -87,27 +90,33 @@ class Costco:
                     self.browser.find_element_by_css_selector('#add-to-cart-btn').click()
                     time.sleep(1)
                     try:
-                        wait(self.browser, self.LONG_TIMEOUT).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".added-to-cart")))
+                        find_immediate_then_wait(self.browser, self.LONG_TIMEOUT, ".added-to-cart")
                         in_cart = True
                         self.status_signal.emit(create_msg("Added to cart", "normal"))
                     except:
+                        add_fail_count += 1
                         time.sleep(self.SHORT_TIMEOUT)
+                    if add_fail_count >= 20:
+                        add_fail_count = 0
+                        raise
             except:
                 in_stock = False
                 time.sleep(self.SHORT_TIMEOUT)
                 self.status_signal.emit(create_msg("Waiting For Restock", "normal"))
                 self.browser.refresh()
 
-    def load_checkout(self):
-        self.status_signal.emit(create_msg("Checking Out", "normal"))
-        checkout_loaded = False
-        while not checkout_loaded:
+    def load_cart(self):
+        self.status_signal.emit(create_msg("Loading Cart", "normal"))
+        cart_loaded = False
+        while not cart_loaded:
             try:
-                self.browser.get("https://www.costco.com/SinglePageCheckoutView")
-                wait(self.browser, self.LONG_TIMEOUT).until(lambda _: self.browser.current_url == "https://www.costco.com/SinglePageCheckoutView")
-                checkout_loaded = True
+                self.browser.get("https://www.costco.com/CheckoutCartDisplayView")
+                clickable_immediate_then_wait(self.browser, self.LONG_TIMEOUT, "#shopCartCheckoutSubmitButton")
+                self.browser.find_element_by_css_selector("#shopCartCheckoutSubmitButton").click()
+                find_immediate_then_wait(self.browser, self.SHORT_TIMEOUT, "#order-summary-body")
+                cart_loaded = True
             except:
-                time.sleep(self.SHORT_TIMEOUT)
+                time.sleep(self.LONG_TIMEOUT)
 
     def check_out(self):
         ordered = False
@@ -117,14 +126,15 @@ class Costco:
                 ordered = True
             except:
                 try:
-                    wait(self.browser, self.LONG_TIMEOUT).until(EC.presence_of_element_located((By.CSS_SELECTOR, "#cc_cvv_div iframe"))).send_keys(self.profile["card_cvv"])
+                    find_immediate_then_wait(self.browser, self.SHORT_TIMEOUT, "#cc_cvv_div iframe")
+                    self.browser.find_element_by_css_selector("#cc_cvv_div iframe").send_keys(self.profile["card_cvv"])
                     time.sleep(1)
-                    wait(self.browser, self.LONG_TIMEOUT).until(EC.element_to_be_clickable((By.CSS_SELECTOR, '[value="Continue to Shipping Options"]')))
+                    clickable_immediate_then_wait(self.browser, self.LONG_TIMEOUT, '[value="Continue to Shipping Options"]')
                     self.browser.find_element_by_css_selector('[value="Continue to Shipping Options"]').click()
                     self.submit_order()
                     ordered = True
                 except:
-                    time.sleep(self.SHORT_TIMEOUT)
+                    time.sleep(self.LONG_TIMEOUT)
                     self.browser.refresh()
 
     def submit_order(self):
