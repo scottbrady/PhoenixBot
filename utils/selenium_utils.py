@@ -210,26 +210,3 @@ def start_browser(link, cookies):
             "domain": cookie["domain"]
         })
     driver.get(link)
-
-def find_immediate_then_wait(browser, timeout, selector):
-    found = False
-    try:
-        WebDriverWait(browser, 1).until(ec.presence_of_element_located((By.CSS_SELECTOR, selector)))
-        found = True
-    except:
-        found = False
-
-    if not found:
-        WebDriverWait(browser, timeout).until(ec.presence_of_element_located((By.CSS_SELECTOR, selector)))
-
-def clickable_immediate_then_wait(browser, timeout, selector):
-    found = False
-    try:
-        browser.find_element_by_css_selector(selector)
-        wait(browser, 1).until(ec.element_to_be_clickable((By.CSS_SELECTOR, selector)))
-        found = True
-    except:
-        found = False
-
-    if not found:
-        WebDriverWait(browser, timeout).until(ec.element_to_be_clickable((By.CSS_SELECTOR, selector)))
