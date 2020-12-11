@@ -9,10 +9,28 @@ from utils import random_delay, send_webhook, create_msg
 from utils.selenium_utils import change_driver
 import settings, time
 
+TIMEOUT_SHORT = 5
+TIMEOUT_LONG = 20
+RESTART_COUNT = 100
+
 class Costco:
     def __init__(self, task_id, status_signal, image_signal, product, profile, proxy, monitor_delay, error_delay, max_price):
         self.task_id, self.status_signal, self.image_signal, self.product, self.profile, self.monitor_delay, self.error_delay = task_id, status_signal, image_signal, product, profile, float(
             monitor_delay), float(error_delay)
+        done = False
+        while not done:
+            try:
+                self.go()
+                done = True
+            except:
+                try:
+                    self.stop()
+                except:
+                    None
+                self.status_signal.emit(create_msg("Restarting Browser", "normal"))
+                time.sleep(5)
+
+    def go(self):
         self.sequence = [
             {'type': 'method', 'selector': '[value="Add to Cart"]', 'method': self.find_and_click_atc, 'message': 'Added to cart', 'message_type': 'normal'}
             , {'type': 'button', 'selector': '[href="/CheckoutCartView"][tabindex="-1"]', 'message': 'Viewing Cart before Checkout', 'message_type': 'normal'}
@@ -26,8 +44,6 @@ class Costco:
         starting_msg = "Starting Costco"
         self.browser = self.init_driver()
         self.product_image = None
-        self.TIMEOUT_SHORT = 5
-        self.TIMEOUT_LONG = 20
         self.did_submit = False
         self.failed = False
         self.retry_attempts = 10
@@ -59,7 +75,7 @@ class Costco:
 
     def login(self):
         self.browser.get("https://www.costco.com/LogonForm")
-        wait(self.browser, self.TIMEOUT_LONG).until(EC.presence_of_element_located((By.ID, "logonId"))).send_keys(settings.costco_user)
+        wait(self.browser, TIMEOUT_LONG).until(EC.presence_of_element_located((By.ID, "logonId"))).send_keys(settings.costco_user)
         self.browser.find_element_by_id("logonPassword").send_keys(settings.costco_pass)
         self.browser.find_element_by_css_selector('[value="Sign In"]').click()
 
@@ -92,7 +108,7 @@ class Costco:
     def monitor(self):
         self.in_stock = False
         self.browser.get(self.product)
-        wait(self.browser, self.TIMEOUT_LONG).until(lambda _: self.browser.current_url == self.product)
+        wait(self.browser, TIMEOUT_LONG).until(lambda _: self.browser.current_url == self.product)
 
         while not self.img_found:
             try:
@@ -104,11 +120,17 @@ class Costco:
             except Exception as e:
                 continue
 
+        count = 0
         while not self.in_stock:
             self.in_stock = self.check_stock()
             if self.in_stock:
                 continue
             else:
+                count += 1
+                if count > RESTART_COUNT:
+                    # raise
+                    count = 0
+                    self.new_tab()
                 self.status_signal.emit(create_msg("Waiting on Restock", "normal"))
                 time.sleep(random_delay(self.monitor_delay, settings.random_delay_start, settings.random_delay_stop))
                 self.browser.refresh()
@@ -184,7 +206,7 @@ class Costco:
             elif step['type'] == 'input':
                 self.fill_field_and_proceed(step['selector'], step['args'])
             if wait_after:
-                time.sleep(self.TIMEOUT_SHORT)
+                time.sleep(TIMEOUT_SHORT)
         
     def process_interruptions(self, attempt=0, silent=False):
         if not silent:
@@ -193,5 +215,19 @@ class Costco:
         for step in self.possible_interruptions:
             self.process_step(step, wait_after=True, silent=True)
 
+    def stop(self):
+        self.browser.close()
+        self.browser.quit()
+
     def save_screenshot(self, name):
         self.browser.get_screenshot_as_file(name + time.strftime("%s") + ".png")
+
+    def new_tab(self):
+        self.status_signal.emit(create_msg("Creating new tab", "normal"))
+        windows_before = self.browser.window_handles
+        self.browser.execute_script(f'window.open("{self.product}")')
+        wait(self.browser, 10).until(EC.number_of_windows_to_be(2))
+        new_window = [x for x in self.browser.window_handles if x not in windows_before][0]
+        self.browser.close()
+        wait(self.browser, 10).until(EC.number_of_windows_to_be(1))
+        self.browser.switch_to_window(new_window)
