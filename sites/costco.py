@@ -95,8 +95,13 @@ class Costco:
             wait(self.browser, 10).until(EC.number_of_windows_to_be(2))
             new_window = [x for x in self.browser.window_handles if x not in windows_before][0]
             self.browser.switch_to_window(new_window)
+        signin_to_buy = self.browser.find_elements_by_css_selector('#sign-in-to-buy-button-v2')
         if len(self.browser.find_elements_by_css_selector('[value="Add to Cart"]')) > 0:
             stock = True
+        elif len(signin_to_buy) > 0 and signin_to_buy[0].is_displayed():
+            self.status_signal.emit(create_msg("Session Expired - Logging In", "normal"))
+            self.login()
+            self.browser.get(self.product)
         if new_tab:
             self.browser.close()
             wait(self.browser, 10).until(EC.number_of_windows_to_be(1))
